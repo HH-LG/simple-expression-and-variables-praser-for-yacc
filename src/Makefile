@@ -22,3 +22,4 @@ all:
 	make postfix
 	make expr_advanced
 	make expr
+	make var
