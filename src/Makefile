@@ -26,4 +26,11 @@ clean:
 	rm -rf *.o *.c
 
 all:
+<<<<<<< HEAD
 	make $(objects)
+=======
+	make postfix
+	make expr_advanced
+	make expr
+	make var
+>>>>>>> 9885d8e0f9c7781bcad5055a21b4fcdc6d18a21c
