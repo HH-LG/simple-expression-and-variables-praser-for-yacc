@@ -58,9 +58,23 @@ lines   :       lines stmt ';' { printf("\t\t VALUE = %f\n", $2); }
 
 stmt    :       VARNAME ASSIGN expr         { if(var_num == VAR_TABLE_LEN)
                                                 { printf("Too many varables, exiting...\n");exit(0);}
-                                              strcpy(var_name_table[var_num], $1);
-                                              var_value_table[var_num] = $3;
-                                              $$ = $3; var_num ++;}
+                                                int isFound = 0;
+                                                for(int i=0;i<var_num;i++) 
+                                                {
+                                                    if(strcmp(var_name_table[i],$1)==0)
+                                                    {
+                                                        var_value_table[i] = $3;
+                                                        $$ = $3;
+                                                        isFound = 1;
+                                                        break;
+                                                    }
+                                                }
+                                                if(!isFound){
+                                                    strcpy(var_name_table[var_num], $1);
+                                                    var_value_table[var_num] = $3;
+                                                    $$ = $3; var_num ++;
+                                                }
+                                            }
         |       expr                        { $$ = $1;}
         ;
 
