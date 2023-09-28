@@ -600,8 +600,8 @@ static const yytype_int8 yytranslate[] =
 /* YYRLINE[YYN] -- Source line where rule number YYN was defined.  */
 static const yytype_int8 yyrline[] =
 {
-       0,    53,    53,    54,    55,    56,    59,    64,    67,    68,
-      69,    70,    71,    72,    73,    74
+       0,    53,    53,    54,    55,    56,    59,    78,    81,    82,
+      83,    84,    85,    86,    87,    88
 };
 #endif
 
@@ -1190,62 +1190,76 @@ yyreduce:
 #line 59 "var.y"
                                             { if(var_num == VAR_TABLE_LEN)
                                                 { printf("Too many varables, exiting...\n");exit(0);}
-                                              strcpy(var_name_table[var_num], (yyvsp[-2].chval));
-                                              var_value_table[var_num] = (yyvsp[0].dval);
-                                              (yyval.dval) = (yyvsp[0].dval); var_num ++;}
-#line 1197 "var.c"
+                                                int isFound = 0;
+                                                for(int i=0;i<var_num;i++) 
+                                                {
+                                                    if(strcmp(var_name_table[i],(yyvsp[-2].chval))==0)
+                                                    {
+                                                        var_value_table[i] = (yyvsp[0].dval);
+                                                        (yyval.dval) = (yyvsp[0].dval);
+                                                        isFound = 1;
+                                                        break;
+                                                    }
+                                                }
+                                                if(!isFound){
+                                                    strcpy(var_name_table[var_num], (yyvsp[-2].chval));
+                                                    var_value_table[var_num] = (yyvsp[0].dval);
+                                                    (yyval.dval) = (yyvsp[0].dval); var_num ++;
+                                                }
+                                            }
+#line 1211 "var.c"
     break;
 
   case 7: /* stmt: expr  */
-#line 64 "var.y"
+#line 78 "var.y"
                                             { (yyval.dval) = (yyvsp[0].dval);}
-#line 1203 "var.c"
+#line 1217 "var.c"
     break;
 
   case 8: /* expr: expr ADD expr  */
-#line 67 "var.y"
+#line 81 "var.y"
                                             { (yyval.dval)=(yyvsp[-2].dval)+(yyvsp[0].dval);}
-#line 1209 "var.c"
+#line 1223 "var.c"
     break;
 
   case 9: /* expr: expr MINUS expr  */
-#line 68 "var.y"
+#line 82 "var.y"
                                             { (yyval.dval)=(yyvsp[-2].dval)-(yyvsp[0].dval);}
-#line 1215 "var.c"
+#line 1229 "var.c"
     break;
 
   case 10: /* expr: expr MULT expr  */
-#line 69 "var.y"
+#line 83 "var.y"
                                             { (yyval.dval)=(yyvsp[-2].dval)*(yyvsp[0].dval);}
-#line 1221 "var.c"
+#line 1235 "var.c"
     break;
 
   case 11: /* expr: expr DIV expr  */
-#line 70 "var.y"
+#line 84 "var.y"
                                             { (yyval.dval)=(yyvsp[-2].dval)/(yyvsp[0].dval);}
-#line 1227 "var.c"
+#line 1241 "var.c"
     break;
 
   case 12: /* expr: MINUS expr  */
-#line 71 "var.y"
+#line 85 "var.y"
                                             { (yyval.dval)=-(yyvsp[0].dval);}
-#line 1233 "var.c"
+#line 1247 "var.c"
     break;
 
   case 13: /* expr: NUMBER  */
-#line 72 "var.y"
+#line 86 "var.y"
                                             { (yyval.dval)=(yyvsp[0].dval);}
-#line 1239 "var.c"
+#line 1253 "var.c"
     break;
 
   case 14: /* expr: L_BRAC expr R_BRAC  */
-#line 73 "var.y"
+#line 87 "var.y"
                                             { (yyval.dval)=(yyvsp[-1].dval);}
-#line 1245 "var.c"
+#line 1259 "var.c"
     break;
 
   case 15: /* expr: VARNAME  */
-#line 74 "var.y"
+#line 88 "var.y"
                                             { for(int i=0;i<var_num;i++) 
                                                 {
                                                     if(strcmp(var_name_table[i],(yyvsp[0].chval))==0)
@@ -1256,11 +1270,11 @@ yyreduce:
                                                 }
         
                                             }
-#line 1260 "var.c"
+#line 1274 "var.c"
     break;
 
 
-#line 1264 "var.c"
+#line 1278 "var.c"
 
       default: break;
     }
@@ -1453,7 +1467,7 @@ yyreturnlab:
   return yyresult;
 }
 
-#line 86 "var.y"
+#line 100 "var.y"
 
 
 // programs section

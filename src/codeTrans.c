@@ -96,18 +96,20 @@ void print_reg(int reg1, int reg2);
 
 char    var_name_table[VAR_TABLE_LEN][VAR_NAME_LEN] = {};   //符号表
 double  var_value_table [VAR_TABLE_LEN] = {};   //符号值表
+int     var_reg_table[VAR_TABLE_LEN] = {};   //寄存器表
 int     var_num = 0;    //当前符号表中的变量个数
 char*   reg_name_table[] = {"%rax","%rbx","%rcx","%rdx","%rsi", 
                         "%rdi","%r8","%r9","%r10","%r11",
                         "%r12","%r13","%r14","%r15"};//寄存器表,共14个
 bool    reg_used_table[14] = {false};//寄存器使用表
+bool    reg_saved_table[14] = {false};//寄存器保存表
 struct  expr{
     int ival;
     int regNo;
 };
 
 
-#line 111 "codeTrans.c"
+#line 113 "codeTrans.c"
 
 # ifndef YY_CAST
 #  ifdef __cplusplus
@@ -183,13 +185,13 @@ extern int yydebug;
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 union YYSTYPE
 {
-#line 41 "codeTrans.y"
+#line 43 "codeTrans.y"
 
     struct expr exprval ;
     int ival;
     char* chval;
 
-#line 193 "codeTrans.c"
+#line 195 "codeTrans.c"
 
 };
 typedef union YYSTYPE YYSTYPE;
@@ -614,8 +616,8 @@ static const yytype_int8 yytranslate[] =
 /* YYRLINE[YYN] -- Source line where rule number YYN was defined.  */
 static const yytype_int8 yyrline[] =
 {
-       0,    67,    67,    68,    69,    70,    73,    78,    81,    82,
-      83,    84,    85,    86,    87,    88
+       0,    69,    69,    70,    71,    72,    75,   107,   110,   111,
+     112,   113,   114,   115,   116,   117
 };
 #endif
 
@@ -1188,92 +1190,120 @@ yyreduce:
   YY_REDUCE_PRINT (yyn);
   switch (yyn)
     {
-  case 2: /* lines: lines stmt ';'  */
-#line 67 "codeTrans.y"
-                               { printf("\t\t VALUE = %d\n", (yyvsp[-1].ival)); }
-#line 1195 "codeTrans.c"
-    break;
-
   case 4: /* lines: lines QUIT  */
-#line 69 "codeTrans.y"
+#line 71 "codeTrans.y"
                                       { printf("Now exiting...\n");exit(0);}
-#line 1201 "codeTrans.c"
+#line 1197 "codeTrans.c"
     break;
 
   case 6: /* stmt: VARNAME ASSIGN expr  */
-#line 73 "codeTrans.y"
+#line 75 "codeTrans.y"
                                             { if(var_num == VAR_TABLE_LEN)
                                                 { printf("Too many varables, exiting...\n");exit(0);}
-                                              strcpy(var_name_table[var_num], (yyvsp[-2].chval));
-                                              var_value_table[var_num] = (yyvsp[0].exprval).ival;
-                                              (yyval.ival) = (yyvsp[0].exprval).ival; var_num ++;}
-#line 1211 "codeTrans.c"
+                                                int isFound = 0;
+                                                for(int i=0;i<var_num;i++) 
+                                                {
+                                                    if(strcmp(var_name_table[i],(yyvsp[-2].chval))==0)
+                                                    {
+                                                        var_value_table[i] = (yyvsp[0].exprval).ival;
+                                                        (yyval.ival) = (yyvsp[0].exprval).ival;
+                                                        isFound = 1;
+                                                        if(var_reg_table[i] != (yyvsp[0].exprval).regNo){
+                                                            printf("\tmov");
+                                                            print_reg(var_reg_table[i], (yyvsp[0].exprval).regNo);
+                                                            if(!reg_saved_table[(yyvsp[0].exprval).regNo]) 
+                                                                reg_free((yyvsp[0].exprval).regNo);
+                                                        }
+                                                        break;
+                                                    }
+                                                }
+                                                if(!isFound){//新建变量
+                                                    strcpy(var_name_table[var_num], (yyvsp[-2].chval));
+                                                    var_value_table[var_num] = (yyvsp[0].exprval).ival;
+                                                    (yyval.ival) = (yyvsp[0].exprval).ival; 
+                                                    var_reg_table[var_num] = reg_alloc();
+                                                    reg_saved_table[var_reg_table[var_num]] = true;
+                                                    printf("\tmov");
+                                                    print_reg(var_reg_table[var_num], (yyvsp[0].exprval).regNo);
+                                                    if(!reg_saved_table[(yyvsp[0].exprval).regNo]) 
+                                                        reg_free((yyvsp[0].exprval).regNo);
+                                                    var_num ++;
+                                                }
+                                            }
+#line 1234 "codeTrans.c"
     break;
 
   case 7: /* stmt: expr  */
-#line 78 "codeTrans.y"
+#line 107 "codeTrans.y"
                                             { (yyval.ival) = (yyvsp[0].exprval).ival;reg_free((yyvsp[0].exprval).regNo);}
-#line 1217 "codeTrans.c"
+#line 1240 "codeTrans.c"
     break;
 
   case 8: /* expr: expr ADD expr  */
-#line 81 "codeTrans.y"
-                                            { (yyval.exprval).ival=(yyvsp[-2].exprval).ival+(yyvsp[0].exprval).ival;printf("\tadd"); print_reg((yyvsp[-2].exprval).regNo, (yyvsp[0].exprval).regNo);reg_free((yyvsp[0].exprval).regNo);}
-#line 1223 "codeTrans.c"
+#line 110 "codeTrans.y"
+                                            { (yyval.exprval).ival=(yyvsp[-2].exprval).ival+(yyvsp[0].exprval).ival;printf("\tadd"); print_reg((yyvsp[-2].exprval).regNo, (yyvsp[0].exprval).regNo);if(!reg_saved_table[(yyvsp[0].exprval).regNo]) reg_free((yyvsp[0].exprval).regNo);}
+#line 1246 "codeTrans.c"
     break;
 
   case 9: /* expr: expr MINUS expr  */
-#line 82 "codeTrans.y"
-                                            { (yyval.exprval).ival=(yyvsp[-2].exprval).ival-(yyvsp[0].exprval).ival;printf("\tsub"); print_reg((yyvsp[-2].exprval).regNo, (yyvsp[0].exprval).regNo);reg_free((yyvsp[0].exprval).regNo);}
-#line 1229 "codeTrans.c"
+#line 111 "codeTrans.y"
+                                            { (yyval.exprval).ival=(yyvsp[-2].exprval).ival-(yyvsp[0].exprval).ival;printf("\tsub"); print_reg((yyvsp[-2].exprval).regNo, (yyvsp[0].exprval).regNo);if(!reg_saved_table[(yyvsp[0].exprval).regNo]) reg_free((yyvsp[0].exprval).regNo);}
+#line 1252 "codeTrans.c"
     break;
 
   case 10: /* expr: expr MULT expr  */
-#line 83 "codeTrans.y"
-                                            { (yyval.exprval).ival=(yyvsp[-2].exprval).ival*(yyvsp[0].exprval).ival;printf("\tmul"); print_reg((yyvsp[-2].exprval).regNo, (yyvsp[0].exprval).regNo);reg_free((yyvsp[0].exprval).regNo);}
-#line 1235 "codeTrans.c"
+#line 112 "codeTrans.y"
+                                            { (yyval.exprval).ival=(yyvsp[-2].exprval).ival*(yyvsp[0].exprval).ival;printf("\tmul"); print_reg((yyvsp[-2].exprval).regNo, (yyvsp[0].exprval).regNo);if(!reg_saved_table[(yyvsp[0].exprval).regNo]) reg_free((yyvsp[0].exprval).regNo);}
+#line 1258 "codeTrans.c"
     break;
 
   case 11: /* expr: expr DIV expr  */
-#line 84 "codeTrans.y"
-                                            { (yyval.exprval).ival=(yyvsp[-2].exprval).ival/(yyvsp[0].exprval).ival;printf("\tdiv"); print_reg((yyvsp[-2].exprval).regNo, (yyvsp[0].exprval).regNo);reg_free((yyvsp[0].exprval).regNo);}
-#line 1241 "codeTrans.c"
+#line 113 "codeTrans.y"
+                                            { (yyval.exprval).ival=(yyvsp[-2].exprval).ival/(yyvsp[0].exprval).ival;printf("\tdiv"); print_reg((yyvsp[-2].exprval).regNo, (yyvsp[0].exprval).regNo);if(!reg_saved_table[(yyvsp[0].exprval).regNo]) reg_free((yyvsp[0].exprval).regNo);}
+#line 1264 "codeTrans.c"
     break;
 
   case 12: /* expr: MINUS expr  */
-#line 85 "codeTrans.y"
+#line 114 "codeTrans.y"
                                             { (yyval.exprval).ival=-(yyvsp[0].exprval).ival;}
-#line 1247 "codeTrans.c"
+#line 1270 "codeTrans.c"
     break;
 
   case 13: /* expr: NUMBER  */
-#line 86 "codeTrans.y"
+#line 115 "codeTrans.y"
                                             { (yyval.exprval).ival=(yyvsp[0].ival); (yyval.exprval).regNo = reg_alloc(); printf("\tmov %s, %d\n", reg_name_table[(yyval.exprval).regNo],(yyvsp[0].ival));}
-#line 1253 "codeTrans.c"
+#line 1276 "codeTrans.c"
     break;
 
   case 14: /* expr: L_BRAC expr R_BRAC  */
-#line 87 "codeTrans.y"
-                                            { (yyval.exprval).ival=(yyvsp[-1].exprval).ival;}
-#line 1259 "codeTrans.c"
+#line 116 "codeTrans.y"
+                                            { (yyval.exprval).ival=(yyvsp[-1].exprval).ival;(yyval.exprval).regNo = (yyvsp[-1].exprval).regNo;}
+#line 1282 "codeTrans.c"
     break;
 
   case 15: /* expr: VARNAME  */
-#line 88 "codeTrans.y"
-                                            { for(int i=0;i<var_num;i++) 
+#line 117 "codeTrans.y"
+                                            { int isFound = 0;
+                                                for(int i=0;i<var_num;i++) 
                                                 {
                                                     if(strcmp(var_name_table[i],(yyvsp[0].chval))==0)
                                                     {
                                                         (yyval.exprval).ival = var_value_table[i];
+                                                        (yyval.exprval).regNo = var_reg_table[i];
+                                                        isFound = 1;
                                                         break;
                                                     }
                                                 }
+                                                if(!isFound){
+                                                    printf("Variable %s not found, exiting...\n", (yyvsp[0].chval));
+                                                    exit(0);
+                                                }
                                             }
-#line 1273 "codeTrans.c"
+#line 1303 "codeTrans.c"
     break;
 
 
-#line 1277 "codeTrans.c"
+#line 1307 "codeTrans.c"
 
       default: break;
     }
@@ -1466,7 +1496,7 @@ yyreturnlab:
   return yyresult;
 }
 
-#line 99 "codeTrans.y"
+#line 135 "codeTrans.y"
 
 //寄存器分配
 int reg_alloc(){

@@ -26,11 +26,13 @@ void print_reg(int reg1, int reg2);
 
 char    var_name_table[VAR_TABLE_LEN][VAR_NAME_LEN] = {};   //符号表
 double  var_value_table [VAR_TABLE_LEN] = {};   //符号值表
+int     var_reg_table[VAR_TABLE_LEN] = {};   //寄存器表
 int     var_num = 0;    //当前符号表中的变量个数
 char*   reg_name_table[] = {"%rax","%rbx","%rcx","%rdx","%rsi", 
                         "%rdi","%r8","%r9","%r10","%r11",
                         "%r12","%r13","%r14","%r15"};//寄存器表,共14个
 bool    reg_used_table[14] = {false};//寄存器使用表
+bool    reg_saved_table[14] = {false};//寄存器保存表
 struct  expr{
     int ival;
     int regNo;
@@ -64,7 +66,7 @@ struct  expr{
 %%
 
 
-lines   :       lines stmt ';' { printf("\t\t VALUE = %d\n", $2); }
+lines   :       lines stmt ';'        //   { printf("\t\t VALUE = %d\n", $2); }
         |       lines ';'
         |       lines QUIT            { printf("Now exiting...\n");exit(0);}
         |       // 空串
@@ -72,26 +74,60 @@ lines   :       lines stmt ';' { printf("\t\t VALUE = %d\n", $2); }
 
 stmt    :       VARNAME ASSIGN expr         { if(var_num == VAR_TABLE_LEN)
                                                 { printf("Too many varables, exiting...\n");exit(0);}
-                                              strcpy(var_name_table[var_num], $1);
-                                              var_value_table[var_num] = $3.ival;
-                                              $$ = $3.ival; var_num ++;}
+                                                int isFound = 0;
+                                                for(int i=0;i<var_num;i++) 
+                                                {
+                                                    if(strcmp(var_name_table[i],$1)==0)
+                                                    {
+                                                        var_value_table[i] = $3.ival;
+                                                        $$ = $3.ival;
+                                                        isFound = 1;
+                                                        if(var_reg_table[i] != $3.regNo){
+                                                            printf("\tmov");
+                                                            print_reg(var_reg_table[i], $3.regNo);
+                                                            if(!reg_saved_table[$3.regNo]) 
+                                                                reg_free($3.regNo);
+                                                        }
+                                                        break;
+                                                    }
+                                                }
+                                                if(!isFound){//新建变量
+                                                    strcpy(var_name_table[var_num], $1);
+                                                    var_value_table[var_num] = $3.ival;
+                                                    $$ = $3.ival; 
+                                                    var_reg_table[var_num] = reg_alloc();
+                                                    reg_saved_table[var_reg_table[var_num]] = true;
+                                                    printf("\tmov");
+                                                    print_reg(var_reg_table[var_num], $3.regNo);
+                                                    if(!reg_saved_table[$3.regNo]) 
+                                                        reg_free($3.regNo);
+                                                    var_num ++;
+                                                }
+                                            }
         |       expr                        { $$ = $1.ival;reg_free($1.regNo);}
         ;
 
-expr    :       expr ADD expr               { $$.ival=$1.ival+$3.ival;printf("\tadd"); print_reg($1.regNo, $3.regNo);reg_free($3.regNo);}
-        |       expr MINUS expr             { $$.ival=$1.ival-$3.ival;printf("\tsub"); print_reg($1.regNo, $3.regNo);reg_free($3.regNo);}
-        |       expr MULT expr              { $$.ival=$1.ival*$3.ival;printf("\tmul"); print_reg($1.regNo, $3.regNo);reg_free($3.regNo);}//假设可以使用乘法指令
-        |       expr DIV expr               { $$.ival=$1.ival/$3.ival;printf("\tdiv"); print_reg($1.regNo, $3.regNo);reg_free($3.regNo);}//假设可以使用除法指令
+expr    :       expr ADD expr               { $$.ival=$1.ival+$3.ival;printf("\tadd"); print_reg($1.regNo, $3.regNo);if(!reg_saved_table[$3.regNo]) reg_free($3.regNo);}
+        |       expr MINUS expr             { $$.ival=$1.ival-$3.ival;printf("\tsub"); print_reg($1.regNo, $3.regNo);if(!reg_saved_table[$3.regNo]) reg_free($3.regNo);}
+        |       expr MULT expr              { $$.ival=$1.ival*$3.ival;printf("\tmul"); print_reg($1.regNo, $3.regNo);if(!reg_saved_table[$3.regNo]) reg_free($3.regNo);}//假设可以使用乘法指令
+        |       expr DIV expr               { $$.ival=$1.ival/$3.ival;printf("\tdiv"); print_reg($1.regNo, $3.regNo);if(!reg_saved_table[$3.regNo]) reg_free($3.regNo);}//假设可以使用除法指令
         |       MINUS expr   %prec UMINUS   { $$.ival=-$2.ival;}//重新指定优先级，因为这里使用的是MINUS，要将优先级改为 UMINUS
         |       NUMBER                      { $$.ival=$1; $$.regNo = reg_alloc(); printf("\tmov %s, %d\n", reg_name_table[$$.regNo],$1);}
-        |       L_BRAC expr R_BRAC          { $$.ival=$2.ival;}
-        |       VARNAME                     { for(int i=0;i<var_num;i++) 
+        |       L_BRAC expr R_BRAC          { $$.ival=$2.ival;$$.regNo = $2.regNo;}
+        |       VARNAME                     { int isFound = 0;
+                                                for(int i=0;i<var_num;i++) 
                                                 {
                                                     if(strcmp(var_name_table[i],$1)==0)
                                                     {
                                                         $$.ival = var_value_table[i];
+                                                        $$.regNo = var_reg_table[i];
+                                                        isFound = 1;
                                                         break;
                                                     }
+                                                }
+                                                if(!isFound){
+                                                    printf("Variable %s not found, exiting...\n", $1);
+                                                    exit(0);
                                                 }
                                             }
         ;
