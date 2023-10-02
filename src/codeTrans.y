@@ -225,9 +225,6 @@ int yylex()
         else if(t == '='){
             return ASSIGN;
         }
-        else if(t == 'q'){
-            return QUIT;
-        }
         else if(isalpha(t)){
             char* tmp = malloc(VAR_NAME_LEN);
             tmp[0] = t;
@@ -239,6 +236,9 @@ int yylex()
             ungetc(t,stdin);
             if(strcmp(tmp,"int")==0)
                 return TYPE_INT;
+            if(t == 'q'){
+                return QUIT;
+            }
             yylval.chval = tmp;
             return VARNAME;
         }
