@@ -236,7 +236,7 @@ int yylex()
             ungetc(t,stdin);
             if(strcmp(tmp,"int")==0)
                 return TYPE_INT;
-            if(t == 'q'){
+            if(strcmp(tmp,"q")==0){
                 return QUIT;
             }
             yylval.chval = tmp;
