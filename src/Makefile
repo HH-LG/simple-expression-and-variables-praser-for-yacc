@@ -1,5 +1,9 @@
 
-objects = codeTrans var postfix expr_advanced expr 
+objects = codeTrans var postfix expr_advanced expr regular
+
+regular: regular.y
+	yacc regular.y -o regular.c
+	gcc regular.c -o regular -fexec-charset=GBK
 
 codeTrans: codeTrans.y
 	yacc codeTrans.y -o codeTrans.c

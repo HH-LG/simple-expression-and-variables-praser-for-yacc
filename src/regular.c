@@ -67,25 +67,61 @@
 
 
 /* First part of user prologue.  */
-#line 1 "expr.y"
+#line 1 "regular.y"
 
-/*********************************************
-YACC file
-基础程序
-Date:2023/9/19
-forked SherryXiye
-**********************************************/
 #include<stdio.h>
 #include<stdlib.h>
-#ifndef YYSTYPE
-#define YYSTYPE double
-#endif
+#include<ctype.h>
+#include<stdbool.h>
+
 int yylex();
 extern int yyparse();
 FILE* yyin;
 void yyerror(const char* s);
 
-#line 89 "expr.c"
+#define epsilon '#'
+
+// 状态的定义
+#define MAX_NEXT_STATE 100
+#define MAX_STATE_SIZE 100
+int CurrentState = 0;
+struct edge     // 边
+{
+    char ch;
+    struct state* nextState;
+};
+struct state    // 状态
+{
+    int id;
+    struct edge nextEdge[MAX_NEXT_STATE];
+    int nextNum;
+};
+struct expr // 表达式的值
+{
+    struct state* start;
+    struct state* end;
+};
+
+/* 操控状态的函数 */
+// 
+void addEdge(struct state *s, char ch, struct state *nextState);
+// 创建新的状态
+struct state* newState(struct edge* nextEdge, int nextNum);
+// 创建新的表达式
+struct expr* newExprval(char ch);
+struct expr* newExprvalSE(struct state* start,struct state* end);
+// 连接两个表达式
+struct expr* connectExprval(struct expr* expr1,struct expr* expr2);
+// 闭包
+struct expr* closureExprval(struct expr* expr);
+// 或
+struct expr* orExprval(struct expr* expr1,struct expr* expr2);
+// 打印状态
+void printState(struct state* s);
+// 打印exprval
+void printExprval(struct expr* expr);
+
+#line 125 "regular.c"
 
 # ifndef YY_CAST
 #  ifdef __cplusplus
@@ -126,7 +162,13 @@ extern int yydebug;
     YYEOF = 0,                     /* "end of file"  */
     YYerror = 256,                 /* error  */
     YYUNDEF = 257,                 /* "invalid token"  */
-    UMINUS = 258                   /* UMINUS  */
+    OR = 258,                      /* OR  */
+    CLOSURE = 259,                 /* CLOSURE  */
+    L_BRAC = 260,                  /* L_BRAC  */
+    R_BRAC = 261,                  /* R_BRAC  */
+    QUIT = 262,                    /* QUIT  */
+    UNIT = 263,                    /* UNIT  */
+    CONNECT = 264                  /* CONNECT  */
   };
   typedef enum yytokentype yytoken_kind_t;
 #endif
@@ -135,11 +177,27 @@ extern int yydebug;
 #define YYEOF 0
 #define YYerror 256
 #define YYUNDEF 257
-#define UMINUS 258
+#define OR 258
+#define CLOSURE 259
+#define L_BRAC 260
+#define R_BRAC 261
+#define QUIT 262
+#define UNIT 263
+#define CONNECT 264
 
 /* Value type.  */
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
-typedef int YYSTYPE;
+union YYSTYPE
+{
+#line 55 "regular.y"
+
+    char chval;
+    struct expr* exprval;
+
+#line 198 "regular.c"
+
+};
+typedef union YYSTYPE YYSTYPE;
 # define YYSTYPE_IS_TRIVIAL 1
 # define YYSTYPE_IS_DECLARED 1
 #endif
@@ -159,28 +217,19 @@ enum yysymbol_kind_t
   YYSYMBOL_YYEOF = 0,                      /* "end of file"  */
   YYSYMBOL_YYerror = 1,                    /* error  */
   YYSYMBOL_YYUNDEF = 2,                    /* "invalid token"  */
-  YYSYMBOL_3_ = 3,                         /* '+'  */
-  YYSYMBOL_4_ = 4,                         /* '-'  */
-  YYSYMBOL_5_ = 5,                         /* '*'  */
-  YYSYMBOL_6_ = 6,                         /* '/'  */
-  YYSYMBOL_UMINUS = 7,                     /* UMINUS  */
-  YYSYMBOL_8_n_ = 8,                       /* '\n'  */
-  YYSYMBOL_9_ = 9,                         /* '('  */
-  YYSYMBOL_10_ = 10,                       /* ')'  */
-  YYSYMBOL_11_0_ = 11,                     /* '0'  */
-  YYSYMBOL_12_1_ = 12,                     /* '1'  */
-  YYSYMBOL_13_2_ = 13,                     /* '2'  */
-  YYSYMBOL_14_3_ = 14,                     /* '3'  */
-  YYSYMBOL_15_4_ = 15,                     /* '4'  */
-  YYSYMBOL_16_5_ = 16,                     /* '5'  */
-  YYSYMBOL_17_6_ = 17,                     /* '6'  */
-  YYSYMBOL_18_7_ = 18,                     /* '7'  */
-  YYSYMBOL_19_8_ = 19,                     /* '8'  */
-  YYSYMBOL_20_9_ = 20,                     /* '9'  */
-  YYSYMBOL_YYACCEPT = 21,                  /* $accept  */
-  YYSYMBOL_lines = 22,                     /* lines  */
-  YYSYMBOL_expr = 23,                      /* expr  */
-  YYSYMBOL_NUMBER = 24                     /* NUMBER  */
+  YYSYMBOL_OR = 3,                         /* OR  */
+  YYSYMBOL_CLOSURE = 4,                    /* CLOSURE  */
+  YYSYMBOL_L_BRAC = 5,                     /* L_BRAC  */
+  YYSYMBOL_R_BRAC = 6,                     /* R_BRAC  */
+  YYSYMBOL_QUIT = 7,                       /* QUIT  */
+  YYSYMBOL_UNIT = 8,                       /* UNIT  */
+  YYSYMBOL_CONNECT = 9,                    /* CONNECT  */
+  YYSYMBOL_10_ = 10,                       /* ';'  */
+  YYSYMBOL_YYACCEPT = 11,                  /* $accept  */
+  YYSYMBOL_lines = 12,                     /* lines  */
+  YYSYMBOL_expr = 13,                      /* expr  */
+  YYSYMBOL_unit_seq = 14,                  /* unit_seq  */
+  YYSYMBOL_unit = 15                       /* unit  */
 };
 typedef enum yysymbol_kind_t yysymbol_kind_t;
 
@@ -508,19 +557,19 @@ union yyalloc
 /* YYFINAL -- State number of the termination state.  */
 #define YYFINAL  2
 /* YYLAST -- Last index in YYTABLE.  */
-#define YYLAST   51
+#define YYLAST   13
 
 /* YYNTOKENS -- Number of terminals.  */
-#define YYNTOKENS  21
+#define YYNTOKENS  11
 /* YYNNTS -- Number of nonterminals.  */
-#define YYNNTS  4
+#define YYNNTS  5
 /* YYNRULES -- Number of rules.  */
-#define YYNRULES  21
+#define YYNRULES  11
 /* YYNSTATES -- Number of states.  */
-#define YYNSTATES  30
+#define YYNSTATES  16
 
 /* YYMAXUTOK -- Last valid token kind.  */
-#define YYMAXUTOK   258
+#define YYMAXUTOK   264
 
 
 /* YYTRANSLATE(TOKEN-NUM) -- Symbol number corresponding to TOKEN-NUM
@@ -535,14 +584,11 @@ union yyalloc
 static const yytype_int8 yytranslate[] =
 {
        0,     2,     2,     2,     2,     2,     2,     2,     2,     2,
-       8,     2,     2,     2,     2,     2,     2,     2,     2,     2,
-       2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
-       2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
-       9,    10,     5,     3,     2,     4,     2,     6,    11,    12,
-      13,    14,    15,    16,    17,    18,    19,    20,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
+       2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
+       2,     2,     2,     2,     2,     2,     2,     2,     2,    10,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
@@ -559,16 +605,19 @@ static const yytype_int8 yytranslate[] =
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
-       2,     2,     2,     2,     2,     2,     1,     2,     7
+       2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
+       2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
+       2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
+       2,     2,     2,     2,     2,     2,     1,     2,     3,     4,
+       5,     6,     7,     8,     9
 };
 
 #if YYDEBUG
 /* YYRLINE[YYN] -- Source line where rule number YYN was defined.  */
 static const yytype_int8 yyrline[] =
 {
-       0,    26,    26,    27,    28,    31,    32,    33,    34,    35,
-      36,    37,    40,    41,    42,    43,    44,    45,    46,    47,
-      48,    49
+       0,    79,    79,    80,    81,    84,    85,    88,    89,    92,
+      93,    94
 };
 #endif
 
@@ -584,10 +633,9 @@ static const char *yysymbol_name (yysymbol_kind_t yysymbol) YY_ATTRIBUTE_UNUSED;
    First, the terminals, then, starting at YYNTOKENS, nonterminals.  */
 static const char *const yytname[] =
 {
-  "\"end of file\"", "error", "\"invalid token\"", "'+'", "'-'", "'*'",
-  "'/'", "UMINUS", "'\\n'", "'('", "')'", "'0'", "'1'", "'2'", "'3'",
-  "'4'", "'5'", "'6'", "'7'", "'8'", "'9'", "$accept", "lines", "expr",
-  "NUMBER", YY_NULLPTR
+  "\"end of file\"", "error", "\"invalid token\"", "OR", "CLOSURE",
+  "L_BRAC", "R_BRAC", "QUIT", "UNIT", "CONNECT", "';'", "$accept", "lines",
+  "expr", "unit_seq", "unit", YY_NULLPTR
 };
 
 static const char *
@@ -597,7 +645,7 @@ yysymbol_name (yysymbol_kind_t yysymbol)
 }
 #endif
 
-#define YYPACT_NINF (-5)
+#define YYPACT_NINF (-4)
 
 #define yypact_value_is_default(Yyn) \
   ((Yyn) == YYPACT_NINF)
@@ -611,9 +659,8 @@ yysymbol_name (yysymbol_kind_t yysymbol)
    STATE-NUM.  */
 static const yytype_int8 yypact[] =
 {
-      -5,     0,    -5,    17,    -5,    17,    -5,    -5,    -5,    -5,
-      -5,    -5,    -5,    -5,    -5,    -5,    43,    -5,    -5,    35,
-      17,    17,    17,    17,    -5,    -5,    -4,    -4,    -5,    -5
+      -4,     0,    -4,    -2,    -4,    -4,    -1,    -2,    -3,     7,
+      -2,    -4,    -3,    -4,    -4,    -4
 };
 
 /* YYDEFACT[STATE-NUM] -- Default reduction number in state STATE-NUM.
@@ -621,21 +668,20 @@ static const yytype_int8 yypact[] =
    means the default is an error.  */
 static const yytype_int8 yydefact[] =
 {
-       4,     0,     1,     0,     3,     0,    12,    13,    14,    15,
-      16,    17,    18,    19,    20,    21,     0,    11,    10,     0,
-       0,     0,     0,     0,     2,     9,     5,     6,     7,     8
+       4,     0,     1,     0,     3,     9,     0,     6,     7,     0,
+       0,     2,     8,    10,    11,     5
 };
 
 /* YYPGOTO[NTERM-NUM].  */
 static const yytype_int8 yypgoto[] =
 {
-      -5,    -5,     2,    -5
+      -4,    -4,     1,    -4,     5
 };
 
 /* YYDEFGOTO[NTERM-NUM].  */
 static const yytype_int8 yydefgoto[] =
 {
-       0,     1,    16,    17
+       0,     1,     6,     7,     8
 };
 
 /* YYTABLE[YYPACT[STATE-NUM]] -- What to do in state STATE-NUM.  If
@@ -643,47 +689,36 @@ static const yytype_int8 yydefgoto[] =
    number is the opposite.  If YYTABLE_NINF, syntax error.  */
 static const yytype_int8 yytable[] =
 {
-       2,    22,    23,     0,     3,    18,     0,    19,     4,     5,
-       0,     6,     7,     8,     9,    10,    11,    12,    13,    14,
-      15,     3,    26,    27,    28,    29,     5,     0,     6,     7,
-       8,     9,    10,    11,    12,    13,    14,    15,    20,    21,
-      22,    23,     0,     0,     0,    25,    20,    21,    22,    23,
-       0,    24
+       2,    13,    10,     3,     9,     3,     5,     4,     5,    11,
+      10,    15,    12,    14
 };
 
 static const yytype_int8 yycheck[] =
 {
-       0,     5,     6,    -1,     4,     3,    -1,     5,     8,     9,
-      -1,    11,    12,    13,    14,    15,    16,    17,    18,    19,
-      20,     4,    20,    21,    22,    23,     9,    -1,    11,    12,
-      13,    14,    15,    16,    17,    18,    19,    20,     3,     4,
-       5,     6,    -1,    -1,    -1,    10,     3,     4,     5,     6,
-      -1,     8
+       0,     4,     3,     5,     3,     5,     8,     7,     8,    10,
+       3,    10,     7,     6
 };
 
 /* YYSTOS[STATE-NUM] -- The symbol kind of the accessing symbol of
    state STATE-NUM.  */
 static const yytype_int8 yystos[] =
 {
-       0,    22,     0,     4,     8,     9,    11,    12,    13,    14,
-      15,    16,    17,    18,    19,    20,    23,    24,    23,    23,
-       3,     4,     5,     6,     8,    10,    23,    23,    23,    23
+       0,    12,     0,     5,     7,     8,    13,    14,    15,    13,
+       3,    10,    15,     4,     6,    13
 };
 
 /* YYR1[RULE-NUM] -- Symbol kind of the left-hand side of rule RULE-NUM.  */
 static const yytype_int8 yyr1[] =
 {
-       0,    21,    22,    22,    22,    23,    23,    23,    23,    23,
-      23,    23,    24,    24,    24,    24,    24,    24,    24,    24,
-      24,    24
+       0,    11,    12,    12,    12,    13,    13,    14,    14,    15,
+      15,    15
 };
 
 /* YYR2[RULE-NUM] -- Number of symbols on the right-hand side of rule RULE-NUM.  */
 static const yytype_int8 yyr2[] =
 {
-       0,     2,     3,     2,     0,     3,     3,     3,     3,     3,
-       2,     1,     1,     1,     1,     1,     1,     1,     1,     1,
-       1,     1
+       0,     2,     3,     2,     0,     3,     1,     1,     2,     1,
+       2,     3
 };
 
 
@@ -1146,110 +1181,62 @@ yyreduce:
   YY_REDUCE_PRINT (yyn);
   switch (yyn)
     {
-  case 2: /* lines: lines expr '\n'  */
-#line 26 "expr.y"
-                                { printf("%f\n", yyvsp[-1]); }
-#line 1153 "expr.c"
+  case 2: /* lines: lines expr ';'  */
+#line 79 "regular.y"
+                                                { printExprval((yyvsp[-1].exprval));CurrentState = 0; }
+#line 1188 "regular.c"
     break;
 
-  case 5: /* expr: expr '+' expr  */
-#line 31 "expr.y"
-                                { yyval=yyvsp[-2]+yyvsp[0]; }
-#line 1159 "expr.c"
+  case 3: /* lines: lines QUIT  */
+#line 80 "regular.y"
+                                                { printf("Now exiting...\n");exit(0); }
+#line 1194 "regular.c"
     break;
 
-  case 6: /* expr: expr '-' expr  */
-#line 32 "expr.y"
-                                { yyval=yyvsp[-2]-yyvsp[0]; }
-#line 1165 "expr.c"
+  case 5: /* expr: expr OR expr  */
+#line 84 "regular.y"
+                                                { (yyval.exprval) = orExprval((yyvsp[-2].exprval),(yyvsp[0].exprval)); free((yyvsp[-2].exprval)); free((yyvsp[0].exprval)); }
+#line 1200 "regular.c"
     break;
 
-  case 7: /* expr: expr '*' expr  */
-#line 33 "expr.y"
-                                { yyval=yyvsp[-2]*yyvsp[0]; }
-#line 1171 "expr.c"
+  case 6: /* expr: unit_seq  */
+#line 85 "regular.y"
+                                                { (yyval.exprval) = (yyvsp[0].exprval); }
+#line 1206 "regular.c"
     break;
 
-  case 8: /* expr: expr '/' expr  */
-#line 34 "expr.y"
-                                { yyval=yyvsp[-2]/yyvsp[0]; }
-#line 1177 "expr.c"
+  case 7: /* unit_seq: unit  */
+#line 88 "regular.y"
+                                                { (yyval.exprval) = (yyvsp[0].exprval); }
+#line 1212 "regular.c"
     break;
 
-  case 9: /* expr: '(' expr ')'  */
-#line 35 "expr.y"
-                                { yyval=yyvsp[-1];}
-#line 1183 "expr.c"
+  case 8: /* unit_seq: unit_seq unit  */
+#line 89 "regular.y"
+                                                { (yyval.exprval) = connectExprval((yyvsp[-1].exprval),(yyvsp[0].exprval)); free((yyvsp[-1].exprval)); free((yyvsp[0].exprval)); }
+#line 1218 "regular.c"
     break;
 
-  case 10: /* expr: '-' expr  */
-#line 36 "expr.y"
-                                        {yyval=-yyvsp[0];}
-#line 1189 "expr.c"
+  case 9: /* unit: UNIT  */
+#line 92 "regular.y"
+                                                { (yyval.exprval) = newExprval((yyvsp[0].chval)); }
+#line 1224 "regular.c"
     break;
 
-  case 12: /* NUMBER: '0'  */
-#line 40 "expr.y"
-                            {yyval=0.0;}
-#line 1195 "expr.c"
+  case 10: /* unit: unit CLOSURE  */
+#line 93 "regular.y"
+                                                { (yyval.exprval) = closureExprval((yyvsp[-1].exprval)); free((yyvsp[-1].exprval)); }
+#line 1230 "regular.c"
     break;
 
-  case 13: /* NUMBER: '1'  */
-#line 41 "expr.y"
-                            {yyval=1.0;}
-#line 1201 "expr.c"
-    break;
-
-  case 14: /* NUMBER: '2'  */
-#line 42 "expr.y"
-                            {yyval=2.0;}
-#line 1207 "expr.c"
-    break;
-
-  case 15: /* NUMBER: '3'  */
-#line 43 "expr.y"
-                            {yyval=3.0;}
-#line 1213 "expr.c"
-    break;
-
-  case 16: /* NUMBER: '4'  */
-#line 44 "expr.y"
-                            {yyval=4.0;}
-#line 1219 "expr.c"
-    break;
-
-  case 17: /* NUMBER: '5'  */
-#line 45 "expr.y"
-                            {yyval=5.0;}
-#line 1225 "expr.c"
-    break;
-
-  case 18: /* NUMBER: '6'  */
-#line 46 "expr.y"
-                            {yyval=6.0;}
-#line 1231 "expr.c"
-    break;
-
-  case 19: /* NUMBER: '7'  */
-#line 47 "expr.y"
-                            {yyval=7.0;}
-#line 1237 "expr.c"
-    break;
-
-  case 20: /* NUMBER: '8'  */
-#line 48 "expr.y"
-                            {yyval=8.0;}
-#line 1243 "expr.c"
-    break;
-
-  case 21: /* NUMBER: '9'  */
-#line 49 "expr.y"
-                            {yyval=9.0;}
-#line 1249 "expr.c"
+  case 11: /* unit: L_BRAC expr R_BRAC  */
+#line 94 "regular.y"
+                                                { (yyval.exprval) = (yyvsp[-1].exprval); }
+#line 1236 "regular.c"
     break;
 
 
-#line 1253 "expr.c"
+#line 1240 "regular.c"
 
       default: break;
     }
@@ -1442,14 +1429,185 @@ yyreturnlab:
   return yyresult;
 }
 
-#line 52 "expr.y"
+#line 98 "regular.y"
 
 
 // programs section
 
 int yylex()
 {
-    return getchar();
+    int t;
+    while(1){
+        t=getchar();
+        if (t==' '||t=='\t'||t=='\n')
+        {
+            // do noting
+        }
+        else if (t == '|')
+        {
+            return OR;
+        }
+        else if (t == '*')
+        {
+            return CLOSURE;
+        }
+        else if (t == '(')
+        {
+            return L_BRAC;
+        }
+        else if (t == ')')
+        {
+            return R_BRAC;
+        }
+        else if (t == '?')
+        {
+            return QUIT;
+        }
+        else if (t == ';')
+        {
+            return t;
+        }
+        else{
+            yylval.chval = t;
+            return UNIT;
+        }
+    }
+}
+struct state* newState(struct edge* nextEdge, int nextNum)
+{
+    struct state* s = (struct state*)malloc(sizeof(struct state));
+    s->id = CurrentState++;
+    s->nextNum = nextNum;
+    if (nextNum > 0)
+    {
+        for (int i = 0; i < nextNum; i++)
+        {
+            s->nextEdge[i] = nextEdge[i];
+        }
+    }
+    else
+    {
+        s->nextEdge[0].nextState = NULL;
+    }
+    return s;
+}
+
+struct expr* newExprval(char ch)
+{
+    struct state* start = newState(NULL,0);
+    struct state* end = newState(NULL,0);
+    addEdge(start, ch, end);
+    return newExprvalSE(start,end);
+}
+
+struct expr* newExprvalSE(struct state* start,struct state* end)
+{
+    struct expr* expr = (struct expr*)malloc(sizeof(struct expr));
+    expr->start = start;
+    expr->end = end;
+    return expr;
+}
+
+void printState(struct state* s)
+{
+    bool stateUsed[MAX_STATE_SIZE] = {false};
+    struct state* stateStack[MAX_STATE_SIZE/2];
+    int size = 0;
+
+    stateStack[size++] = s;
+
+    FILE *fp = freopen("output.dot", "w", stdout);  //重定向
+    if (fp == NULL)
+    {
+        printf("error opening file\n");
+        exit(-1);
+    }
+
+    printf("digraph G {\n");
+    while(size)
+    {
+        struct state* curState = stateStack[--size];
+        
+        stateUsed[curState->id] = true;
+        if (curState->nextNum == 0)
+            continue;
+
+        for (int i = 0; i < curState->nextNum; i++)
+        {
+            printf("\t%d -> %d [label=\"%c\"];\n", curState->id, curState->nextEdge[i].nextState->id, curState->nextEdge[i].ch);
+        }
+
+        for (int i = 0; i < curState->nextNum; i++)
+        {
+            if (!stateUsed[curState->nextEdge[i].nextState->id])
+            {
+                stateStack[size++] = curState->nextEdge[i].nextState;
+            }
+        }
+    }
+    printf("}\n");
+    fclose(fp);
+}
+
+void printExprval(struct expr* expr)
+{
+    printState(expr->start);
+}
+
+struct expr* connectExprval(struct expr* expr1,struct expr* expr2)
+{
+    if (expr2 == NULL)
+        return expr1;
+    struct state *interS = expr1->end;
+    struct state *interE = expr2->start;
+    interS->nextNum = interE->nextNum;
+
+    for (int i = 0; i< interE->nextNum; i++)
+    {
+        interS->nextEdge[i] = interE->nextEdge[i];
+    }
+    return newExprvalSE(expr1->start,expr2->end);
+}
+
+void addEdge(struct state *s, char ch, struct state *nextState)
+{
+    struct edge e;
+    e.ch = ch;
+    e.nextState = nextState;
+    s->nextEdge[s->nextNum++] = e;
+}
+
+struct expr* closureExprval(struct expr* expr)
+{
+    struct state *start = expr->start;
+    struct state *end = expr->end;
+
+    struct state *new_start = newState(NULL, 0);
+    struct state *new_end = newState(NULL, 0);
+
+    addEdge(end, epsilon, start); //反向边
+    addEdge(new_start, epsilon, start);
+    addEdge(end, epsilon, new_end);
+    addEdge(new_start, epsilon, new_end);
+    return newExprvalSE(new_start, new_end);
+}
+
+struct expr* orExprval(struct expr* expr1,struct expr* expr2)
+{
+    struct state *start1 = expr1->start;
+    struct state *end1 = expr1->end;
+    struct state *start2 = expr2->start;
+    struct state *end2 = expr2->end;
+
+    struct state *new_start = newState(NULL, 0);
+    struct state *new_end = newState(NULL, 0);
+
+    addEdge(new_start, epsilon, start1);
+    addEdge(new_start, epsilon, start2);
+    addEdge(end1, epsilon, new_end);
+    addEdge(end2, epsilon, new_end);
+
+    return newExprvalSE(new_start, new_end);
 }
 
 int main(void)

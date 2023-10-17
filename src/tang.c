@@ -67,25 +67,44 @@
 
 
 /* First part of user prologue.  */
-#line 1 "expr.y"
+#line 1 "tang.y"
 
 /*********************************************
 YACC file
 基础程序
-Date:2023/9/19
-forked SherryXiye
+Date:2023/10/2
+实现SysY到汇编的编译器，支持声明变量、常量，赋值，连续表达式
 **********************************************/
 #include<stdio.h>
 #include<stdlib.h>
-#ifndef YYSTYPE
-#define YYSTYPE double
-#endif
+#include<ctype.h>
+#include<string.h>
+#include<stdbool.h>
+
 int yylex();
 extern int yyparse();
 FILE* yyin;
 void yyerror(const char* s);
+// 符号表操作函数声明
+struct symbol* findSymbol(char* name);
+void addSymbol(char* name, double value, bool isConst, bool isAllocated);
 
-#line 89 "expr.c"
+#define MAX_NAME_LEN 20
+// 符号表
+struct symbol{
+    char *name;
+    double value;
+    struct symbol *next;
+    bool isConst;  // 是否是常量
+    bool isAllocated;  // 是否已经赋值
+};
+// 头指针
+struct symbol *symbolTable = NULL;
+int GLOBAL_REG = 0;  // 寄存器编号
+
+
+
+#line 108 "tang.c"
 
 # ifndef YY_CAST
 #  ifdef __cplusplus
@@ -126,7 +145,22 @@ extern int yydebug;
     YYEOF = 0,                     /* "end of file"  */
     YYerror = 256,                 /* error  */
     YYUNDEF = 257,                 /* "invalid token"  */
-    UMINUS = 258                   /* UMINUS  */
+    NUMBER = 258,                  /* NUMBER  */
+    TYPE = 259,                    /* TYPE  */
+    CONSTANT = 260,                /* CONSTANT  */
+    AND = 261,                     /* AND  */
+    OR = 262,                      /* OR  */
+    ADD = 263,                     /* ADD  */
+    MINUS = 264,                   /* MINUS  */
+    MUL = 265,                     /* MUL  */
+    DIV = 266,                     /* DIV  */
+    LPAREN = 267,                  /* LPAREN  */
+    RPAREN = 268,                  /* RPAREN  */
+    QUIT = 269,                    /* QUIT  */
+    IDENTIFIER = 270,              /* IDENTIFIER  */
+    ASSIGN = 271,                  /* ASSIGN  */
+    NOT = 272,                     /* NOT  */
+    UMINUS = 273                   /* UMINUS  */
   };
   typedef enum yytokentype yytoken_kind_t;
 #endif
@@ -135,11 +169,36 @@ extern int yydebug;
 #define YYEOF 0
 #define YYerror 256
 #define YYUNDEF 257
-#define UMINUS 258
+#define NUMBER 258
+#define TYPE 259
+#define CONSTANT 260
+#define AND 261
+#define OR 262
+#define ADD 263
+#define MINUS 264
+#define MUL 265
+#define DIV 266
+#define LPAREN 267
+#define RPAREN 268
+#define QUIT 269
+#define IDENTIFIER 270
+#define ASSIGN 271
+#define NOT 272
+#define UMINUS 273
 
 /* Value type.  */
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
-typedef int YYSTYPE;
+union YYSTYPE
+{
+#line 38 "tang.y"
+
+    int dval;  // 变量值 -> 改成int 简化汇编代码
+    char *name;  // 变量名
+
+#line 199 "tang.c"
+
+};
+typedef union YYSTYPE YYSTYPE;
 # define YYSTYPE_IS_TRIVIAL 1
 # define YYSTYPE_IS_DECLARED 1
 #endif
@@ -159,28 +218,27 @@ enum yysymbol_kind_t
   YYSYMBOL_YYEOF = 0,                      /* "end of file"  */
   YYSYMBOL_YYerror = 1,                    /* error  */
   YYSYMBOL_YYUNDEF = 2,                    /* "invalid token"  */
-  YYSYMBOL_3_ = 3,                         /* '+'  */
-  YYSYMBOL_4_ = 4,                         /* '-'  */
-  YYSYMBOL_5_ = 5,                         /* '*'  */
-  YYSYMBOL_6_ = 6,                         /* '/'  */
-  YYSYMBOL_UMINUS = 7,                     /* UMINUS  */
-  YYSYMBOL_8_n_ = 8,                       /* '\n'  */
-  YYSYMBOL_9_ = 9,                         /* '('  */
-  YYSYMBOL_10_ = 10,                       /* ')'  */
-  YYSYMBOL_11_0_ = 11,                     /* '0'  */
-  YYSYMBOL_12_1_ = 12,                     /* '1'  */
-  YYSYMBOL_13_2_ = 13,                     /* '2'  */
-  YYSYMBOL_14_3_ = 14,                     /* '3'  */
-  YYSYMBOL_15_4_ = 15,                     /* '4'  */
-  YYSYMBOL_16_5_ = 16,                     /* '5'  */
-  YYSYMBOL_17_6_ = 17,                     /* '6'  */
-  YYSYMBOL_18_7_ = 18,                     /* '7'  */
-  YYSYMBOL_19_8_ = 19,                     /* '8'  */
-  YYSYMBOL_20_9_ = 20,                     /* '9'  */
-  YYSYMBOL_YYACCEPT = 21,                  /* $accept  */
-  YYSYMBOL_lines = 22,                     /* lines  */
-  YYSYMBOL_expr = 23,                      /* expr  */
-  YYSYMBOL_NUMBER = 24                     /* NUMBER  */
+  YYSYMBOL_NUMBER = 3,                     /* NUMBER  */
+  YYSYMBOL_TYPE = 4,                       /* TYPE  */
+  YYSYMBOL_CONSTANT = 5,                   /* CONSTANT  */
+  YYSYMBOL_AND = 6,                        /* AND  */
+  YYSYMBOL_OR = 7,                         /* OR  */
+  YYSYMBOL_ADD = 8,                        /* ADD  */
+  YYSYMBOL_MINUS = 9,                      /* MINUS  */
+  YYSYMBOL_MUL = 10,                       /* MUL  */
+  YYSYMBOL_DIV = 11,                       /* DIV  */
+  YYSYMBOL_LPAREN = 12,                    /* LPAREN  */
+  YYSYMBOL_RPAREN = 13,                    /* RPAREN  */
+  YYSYMBOL_QUIT = 14,                      /* QUIT  */
+  YYSYMBOL_IDENTIFIER = 15,                /* IDENTIFIER  */
+  YYSYMBOL_ASSIGN = 16,                    /* ASSIGN  */
+  YYSYMBOL_NOT = 17,                       /* NOT  */
+  YYSYMBOL_UMINUS = 18,                    /* UMINUS  */
+  YYSYMBOL_19_ = 19,                       /* ';'  */
+  YYSYMBOL_YYACCEPT = 20,                  /* $accept  */
+  YYSYMBOL_lines = 21,                     /* lines  */
+  YYSYMBOL_stmt = 22,                      /* stmt  */
+  YYSYMBOL_expr = 23                       /* expr  */
 };
 typedef enum yysymbol_kind_t yysymbol_kind_t;
 
@@ -508,19 +566,19 @@ union yyalloc
 /* YYFINAL -- State number of the termination state.  */
 #define YYFINAL  2
 /* YYLAST -- Last index in YYTABLE.  */
-#define YYLAST   51
+#define YYLAST   63
 
 /* YYNTOKENS -- Number of terminals.  */
-#define YYNTOKENS  21
+#define YYNTOKENS  20
 /* YYNNTS -- Number of nonterminals.  */
 #define YYNNTS  4
 /* YYNRULES -- Number of rules.  */
-#define YYNRULES  21
+#define YYNRULES  22
 /* YYNSTATES -- Number of states.  */
-#define YYNSTATES  30
+#define YYNSTATES  41
 
 /* YYMAXUTOK -- Last valid token kind.  */
-#define YYMAXUTOK   258
+#define YYMAXUTOK   273
 
 
 /* YYTRANSLATE(TOKEN-NUM) -- Symbol number corresponding to TOKEN-NUM
@@ -535,14 +593,11 @@ union yyalloc
 static const yytype_int8 yytranslate[] =
 {
        0,     2,     2,     2,     2,     2,     2,     2,     2,     2,
-       8,     2,     2,     2,     2,     2,     2,     2,     2,     2,
-       2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
-       2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
-       9,    10,     5,     3,     2,     4,     2,     6,    11,    12,
-      13,    14,    15,    16,    17,    18,    19,    20,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
+       2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
+       2,     2,     2,     2,     2,     2,     2,     2,     2,    19,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
@@ -559,16 +614,21 @@ static const yytype_int8 yytranslate[] =
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
-       2,     2,     2,     2,     2,     2,     1,     2,     7
+       2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
+       2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
+       2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
+       2,     2,     2,     2,     2,     2,     1,     2,     3,     4,
+       5,     6,     7,     8,     9,    10,    11,    12,    13,    14,
+      15,    16,    17,    18
 };
 
 #if YYDEBUG
 /* YYRLINE[YYN] -- Source line where rule number YYN was defined.  */
-static const yytype_int8 yyrline[] =
+static const yytype_uint8 yyrline[] =
 {
-       0,    26,    26,    27,    28,    31,    32,    33,    34,    35,
-      36,    37,    40,    41,    42,    43,    44,    45,    46,    47,
-      48,    49
+       0,    72,    72,    73,    74,    75,    78,    79,    88,    94,
+      99,   104,   109,   114,   119,   124,   129,   134,   139,   145,
+     146,   149,   153
 };
 #endif
 
@@ -584,10 +644,10 @@ static const char *yysymbol_name (yysymbol_kind_t yysymbol) YY_ATTRIBUTE_UNUSED;
    First, the terminals, then, starting at YYNTOKENS, nonterminals.  */
 static const char *const yytname[] =
 {
-  "\"end of file\"", "error", "\"invalid token\"", "'+'", "'-'", "'*'",
-  "'/'", "UMINUS", "'\\n'", "'('", "')'", "'0'", "'1'", "'2'", "'3'",
-  "'4'", "'5'", "'6'", "'7'", "'8'", "'9'", "$accept", "lines", "expr",
-  "NUMBER", YY_NULLPTR
+  "\"end of file\"", "error", "\"invalid token\"", "NUMBER", "TYPE",
+  "CONSTANT", "AND", "OR", "ADD", "MINUS", "MUL", "DIV", "LPAREN",
+  "RPAREN", "QUIT", "IDENTIFIER", "ASSIGN", "NOT", "UMINUS", "';'",
+  "$accept", "lines", "stmt", "expr", YY_NULLPTR
 };
 
 static const char *
@@ -597,7 +657,7 @@ yysymbol_name (yysymbol_kind_t yysymbol)
 }
 #endif
 
-#define YYPACT_NINF (-5)
+#define YYPACT_NINF (-9)
 
 #define yypact_value_is_default(Yyn) \
   ((Yyn) == YYPACT_NINF)
@@ -611,9 +671,11 @@ yysymbol_name (yysymbol_kind_t yysymbol)
    STATE-NUM.  */
 static const yytype_int8 yypact[] =
 {
-      -5,     0,    -5,    17,    -5,    17,    -5,    -5,    -5,    -5,
-      -5,    -5,    -5,    -5,    -5,    -5,    43,    -5,    -5,    35,
-      17,    17,    17,    17,    -5,    -5,    -4,    -4,    -5,    -5
+      -9,    23,    -9,    -9,    -4,    10,    36,    36,    -9,     8,
+      36,    -9,     6,    48,    13,     0,    -9,    -9,    -1,    36,
+      -9,    -9,    36,    36,    36,    36,    36,    36,    36,    14,
+      -9,    48,    52,    52,    -8,    -8,    -9,    -9,    48,    36,
+      48
 };
 
 /* YYDEFACT[STATE-NUM] -- Default reduction number in state STATE-NUM.
@@ -621,21 +683,23 @@ static const yytype_int8 yypact[] =
    means the default is an error.  */
 static const yytype_int8 yydefact[] =
 {
-       4,     0,     1,     0,     3,     0,    12,    13,    14,    15,
-      16,    17,    18,    19,    20,    21,     0,    11,    10,     0,
-       0,     0,     0,     0,     2,     9,     5,     6,     7,     8
+       5,     0,     1,    21,     0,     0,     0,     0,     4,    22,
+       0,     3,     0,     6,     8,     0,    22,    20,     0,     0,
+      18,     2,     0,     0,     0,     0,     0,     0,     0,    11,
+      19,     7,    16,    17,    12,    13,    14,    15,     9,     0,
+      10
 };
 
 /* YYPGOTO[NTERM-NUM].  */
 static const yytype_int8 yypgoto[] =
 {
-      -5,    -5,     2,    -5
+      -9,    -9,    -9,    -6
 };
 
 /* YYDEFGOTO[NTERM-NUM].  */
 static const yytype_int8 yydefgoto[] =
 {
-       0,     1,    16,    17
+       0,     1,    12,    13
 };
 
 /* YYTABLE[YYPACT[STATE-NUM]] -- What to do in state STATE-NUM.  If
@@ -643,47 +707,51 @@ static const yytype_int8 yydefgoto[] =
    number is the opposite.  If YYTABLE_NINF, syntax error.  */
 static const yytype_int8 yytable[] =
 {
-       2,    22,    23,     0,     3,    18,     0,    19,     4,     5,
-       0,     6,     7,     8,     9,    10,    11,    12,    13,    14,
-      15,     3,    26,    27,    28,    29,     5,     0,     6,     7,
-       8,     9,    10,    11,    12,    13,    14,    15,    20,    21,
-      22,    23,     0,     0,     0,    25,    20,    21,    22,    23,
-       0,    24
+      17,    18,    26,    27,    20,    22,    23,    24,    25,    26,
+      27,    14,    30,    31,    15,    29,    32,    33,    34,    35,
+      36,    37,    38,     2,    19,    21,     3,     4,     5,    28,
+      39,     0,     6,    40,     0,     7,     0,     8,     9,     3,
+      10,     0,    11,     0,     0,     6,     0,     0,     7,     0,
+       0,    16,     0,    10,    22,    23,    24,    25,    26,    27,
+      24,    25,    26,    27
 };
 
 static const yytype_int8 yycheck[] =
 {
-       0,     5,     6,    -1,     4,     3,    -1,     5,     8,     9,
-      -1,    11,    12,    13,    14,    15,    16,    17,    18,    19,
-      20,     4,    20,    21,    22,    23,     9,    -1,    11,    12,
-      13,    14,    15,    16,    17,    18,    19,    20,     3,     4,
-       5,     6,    -1,    -1,    -1,    10,     3,     4,     5,     6,
-      -1,     8
+       6,     7,    10,    11,    10,     6,     7,     8,     9,    10,
+      11,    15,    13,    19,     4,    15,    22,    23,    24,    25,
+      26,    27,    28,     0,    16,    19,     3,     4,     5,    16,
+      16,    -1,     9,    39,    -1,    12,    -1,    14,    15,     3,
+      17,    -1,    19,    -1,    -1,     9,    -1,    -1,    12,    -1,
+      -1,    15,    -1,    17,     6,     7,     8,     9,    10,    11,
+       8,     9,    10,    11
 };
 
 /* YYSTOS[STATE-NUM] -- The symbol kind of the accessing symbol of
    state STATE-NUM.  */
 static const yytype_int8 yystos[] =
 {
-       0,    22,     0,     4,     8,     9,    11,    12,    13,    14,
-      15,    16,    17,    18,    19,    20,    23,    24,    23,    23,
-       3,     4,     5,     6,     8,    10,    23,    23,    23,    23
+       0,    21,     0,     3,     4,     5,     9,    12,    14,    15,
+      17,    19,    22,    23,    15,     4,    15,    23,    23,    16,
+      23,    19,     6,     7,     8,     9,    10,    11,    16,    15,
+      13,    23,    23,    23,    23,    23,    23,    23,    23,    16,
+      23
 };
 
 /* YYR1[RULE-NUM] -- Symbol kind of the left-hand side of rule RULE-NUM.  */
 static const yytype_int8 yyr1[] =
 {
-       0,    21,    22,    22,    22,    23,    23,    23,    23,    23,
-      23,    23,    24,    24,    24,    24,    24,    24,    24,    24,
-      24,    24
+       0,    20,    21,    21,    21,    21,    22,    22,    22,    22,
+      22,    22,    23,    23,    23,    23,    23,    23,    23,    23,
+      23,    23,    23
 };
 
 /* YYR2[RULE-NUM] -- Number of symbols on the right-hand side of rule RULE-NUM.  */
 static const yytype_int8 yyr2[] =
 {
-       0,     2,     3,     2,     0,     3,     3,     3,     3,     3,
-       2,     1,     1,     1,     1,     1,     1,     1,     1,     1,
-       1,     1
+       0,     2,     3,     2,     2,     0,     1,     3,     2,     4,
+       5,     3,     3,     3,     3,     3,     3,     3,     2,     3,
+       2,     1,     1
 };
 
 
@@ -1146,110 +1214,189 @@ yyreduce:
   YY_REDUCE_PRINT (yyn);
   switch (yyn)
     {
-  case 2: /* lines: lines expr '\n'  */
-#line 26 "expr.y"
-                                { printf("%f\n", yyvsp[-1]); }
-#line 1153 "expr.c"
+  case 2: /* lines: lines stmt ';'  */
+#line 72 "tang.y"
+                               { printf("----------\n"); GLOBAL_REG = 0;}
+#line 1221 "tang.c"
     break;
 
-  case 5: /* expr: expr '+' expr  */
-#line 31 "expr.y"
-                                { yyval=yyvsp[-2]+yyvsp[0]; }
-#line 1159 "expr.c"
+  case 4: /* lines: lines QUIT  */
+#line 74 "tang.y"
+                            { exit(0); }
+#line 1227 "tang.c"
     break;
 
-  case 6: /* expr: expr '-' expr  */
-#line 32 "expr.y"
-                                { yyval=yyvsp[-2]-yyvsp[0]; }
-#line 1165 "expr.c"
+  case 6: /* stmt: expr  */
+#line 78 "tang.y"
+                        {   (yyval.dval)=(yyvsp[0].dval); }
+#line 1233 "tang.c"
     break;
 
-  case 7: /* expr: expr '*' expr  */
-#line 33 "expr.y"
-                                { yyval=yyvsp[-2]*yyvsp[0]; }
-#line 1171 "expr.c"
+  case 7: /* stmt: IDENTIFIER ASSIGN expr  */
+#line 79 "tang.y"
+                                        {   (yyval.dval)=(yyvsp[0].dval);      // 赋值语句
+                                            struct symbol *entry=findSymbol((yyvsp[-2].name));  // 必须声明过
+                                            if(entry==NULL){
+                                                yyerror("undeclared variable");
+                                            }
+                                            addSymbol((yyvsp[-2].name),(yyvsp[0].dval),false,true);  // 添加到符号表
+                                            printf("ldr R1, =%s\n",(yyvsp[-2].name));
+                                            printf("str R0, [R1]\n");
+                                        }
+#line 1247 "tang.c"
     break;
 
-  case 8: /* expr: expr '/' expr  */
-#line 34 "expr.y"
-                                { yyval=yyvsp[-2]/yyvsp[0]; }
-#line 1177 "expr.c"
+  case 8: /* stmt: TYPE IDENTIFIER  */
+#line 88 "tang.y"
+                                        {   (yyval.dval)=0;       // 声明变量
+                                            addSymbol((yyvsp[0].name),0,false,false);  // 添加到符号表
+                                            //printf("ldr R1, =%s\n",$2);  // 不赋初值
+                                            //printf("mov R0 #0\n");
+                                            //printf("str R0, [R1]\n");
+                                        }
+#line 1258 "tang.c"
     break;
 
-  case 9: /* expr: '(' expr ')'  */
-#line 35 "expr.y"
-                                { yyval=yyvsp[-1];}
-#line 1183 "expr.c"
+  case 9: /* stmt: TYPE IDENTIFIER ASSIGN expr  */
+#line 94 "tang.y"
+                                            {   (yyval.dval)=(yyvsp[0].dval);      // 声明变量且带初值
+                                                addSymbol((yyvsp[-2].name),(yyvsp[0].dval),false,true);  // 添加到符号表
+                                                printf("ldr R1, =%s\n",(yyvsp[-2].name));
+                                                printf("str R0, [R1]\n");
+                                            }
+#line 1268 "tang.c"
     break;
 
-  case 10: /* expr: '-' expr  */
-#line 36 "expr.y"
-                                        {yyval=-yyvsp[0];}
-#line 1189 "expr.c"
+  case 10: /* stmt: CONSTANT TYPE IDENTIFIER ASSIGN expr  */
+#line 99 "tang.y"
+                                                     {  (yyval.dval)=(yyvsp[0].dval);  // 声明常量且带初值
+                                                        addSymbol((yyvsp[-2].name),(yyvsp[0].dval),true,true);  // 添加到符号表
+                                                        printf("ldr R1, =%s\n",(yyvsp[-2].name));
+                                                        printf("str R0, [R1]\n");
+                                                }
+#line 1278 "tang.c"
     break;
 
-  case 12: /* NUMBER: '0'  */
-#line 40 "expr.y"
-                            {yyval=0.0;}
-#line 1195 "expr.c"
+  case 11: /* stmt: CONSTANT TYPE IDENTIFIER  */
+#line 104 "tang.y"
+                                            {   (yyval.dval)=0;       // 声明常量
+                                                addSymbol((yyvsp[0].name),0,true,false);  // 添加到符号表
+                                            }
+#line 1286 "tang.c"
     break;
 
-  case 13: /* NUMBER: '1'  */
-#line 41 "expr.y"
-                            {yyval=1.0;}
-#line 1201 "expr.c"
+  case 12: /* expr: expr ADD expr  */
+#line 109 "tang.y"
+                                {   
+                                    (yyval.dval)=(yyvsp[-2].dval)+(yyvsp[0].dval); 
+                                    printf("ADD R0 R0 R1\n");
+                                    GLOBAL_REG -= 1;  // 为了连续表达式
+                                }
+#line 1296 "tang.c"
     break;
 
-  case 14: /* NUMBER: '2'  */
-#line 42 "expr.y"
-                            {yyval=2.0;}
-#line 1207 "expr.c"
+  case 13: /* expr: expr MINUS expr  */
+#line 114 "tang.y"
+                                {   
+                                    (yyval.dval)=(yyvsp[-2].dval)-(yyvsp[0].dval);
+                                    printf("SUB R0 R0 R1\n");
+                                    GLOBAL_REG -= 1;
+                                }
+#line 1306 "tang.c"
     break;
 
-  case 15: /* NUMBER: '3'  */
-#line 43 "expr.y"
-                            {yyval=3.0;}
-#line 1213 "expr.c"
+  case 14: /* expr: expr MUL expr  */
+#line 119 "tang.y"
+                                {   
+                                    (yyval.dval)=(yyvsp[-2].dval)*(yyvsp[0].dval);
+                                    printf("MUL R0 R0 R1\n"); 
+                                    GLOBAL_REG -= 1;
+                                }
+#line 1316 "tang.c"
     break;
 
-  case 16: /* NUMBER: '4'  */
-#line 44 "expr.y"
-                            {yyval=4.0;}
-#line 1219 "expr.c"
+  case 15: /* expr: expr DIV expr  */
+#line 124 "tang.y"
+                                {   
+                                    (yyval.dval)=(yyvsp[-2].dval)/(yyvsp[0].dval);
+                                    printf("DIV R0 R0 R1\n");
+                                    GLOBAL_REG -= 1; 
+                                }
+#line 1326 "tang.c"
     break;
 
-  case 17: /* NUMBER: '5'  */
-#line 45 "expr.y"
-                            {yyval=5.0;}
-#line 1225 "expr.c"
+  case 16: /* expr: expr AND expr  */
+#line 129 "tang.y"
+                                {   
+                                    (yyval.dval)=(yyvsp[-2].dval)&&(yyvsp[0].dval);
+                                    printf("AND R0 R0 R1\n");
+                                    GLOBAL_REG -= 1;
+                                }
+#line 1336 "tang.c"
     break;
 
-  case 18: /* NUMBER: '6'  */
-#line 46 "expr.y"
-                            {yyval=6.0;}
-#line 1231 "expr.c"
+  case 17: /* expr: expr OR expr  */
+#line 134 "tang.y"
+                                {   
+                                    (yyval.dval)=(yyvsp[-2].dval)||(yyvsp[0].dval);
+                                    printf("OR R0 R0 R1\n");
+                                    GLOBAL_REG -= 1;
+                                }
+#line 1346 "tang.c"
     break;
 
-  case 19: /* NUMBER: '7'  */
-#line 47 "expr.y"
-                            {yyval=7.0;}
-#line 1237 "expr.c"
+  case 18: /* expr: NOT expr  */
+#line 139 "tang.y"
+                                {   
+                                    (yyval.dval)=!(yyvsp[0].dval);
+                                    printf("CMP R%d #0\n",GLOBAL_REG-1);
+                                    printf("MOVNE R%d #0\n",GLOBAL_REG-1);
+                                    printf("MOVEQ R%d #1\n",GLOBAL_REG-1);
+                                }
+#line 1357 "tang.c"
     break;
 
-  case 20: /* NUMBER: '8'  */
-#line 48 "expr.y"
-                            {yyval=8.0;}
-#line 1243 "expr.c"
+  case 19: /* expr: LPAREN expr RPAREN  */
+#line 145 "tang.y"
+                                     { (yyval.dval)=(yyvsp[-1].dval); }
+#line 1363 "tang.c"
     break;
 
-  case 21: /* NUMBER: '9'  */
-#line 49 "expr.y"
-                            {yyval=9.0;}
-#line 1249 "expr.c"
+  case 20: /* expr: MINUS expr  */
+#line 146 "tang.y"
+                                        {   (yyval.dval)=-(yyvsp[0].dval);
+                                            printf("NEG R%d R%d\n",GLOBAL_REG-1,GLOBAL_REG-1);
+                                        }
+#line 1371 "tang.c"
+    break;
+
+  case 21: /* expr: NUMBER  */
+#line 149 "tang.y"
+                                {   (yyval.dval)=(yyvsp[0].dval);
+                                    printf("MOV R%d %d\n",GLOBAL_REG,(yyvsp[0].dval));
+                                    GLOBAL_REG++;  // 每个值由NUMBER来打印
+                                }
+#line 1380 "tang.c"
+    break;
+
+  case 22: /* expr: IDENTIFIER  */
+#line 153 "tang.y"
+                                {   struct symbol *entry=findSymbol((yyvsp[0].name));
+                                    if(entry==NULL){
+                                        yyerror("undeclared variable");
+                                    }
+                                    if(!entry->isAllocated){
+                                        yyerror("variable not allocated");
+                                    }
+                                    (yyval.dval)=entry->value;
+                                    printf("ldr R%d, [%s]\n",GLOBAL_REG,(yyvsp[0].name));
+                                    GLOBAL_REG++;  // 变量等价于NUMBER
+                                }
+#line 1396 "tang.c"
     break;
 
 
-#line 1253 "expr.c"
+#line 1400 "tang.c"
 
       default: break;
     }
@@ -1442,14 +1589,137 @@ yyreturnlab:
   return yyresult;
 }
 
-#line 52 "expr.y"
+#line 166 "tang.y"
 
 
 // programs section
 
-int yylex()
+int yylex()  // 词法分析器
 {
-    return getchar();
+    int t;
+    while(1){
+        t = getchar();
+        if(t==' '||t=='\t'||t=='\n'){  // 忽略空白符
+            // do noting
+        }
+        else if(isdigit(t)){
+            // 解析多位数字返回数字类型 
+            yylval.dval = 0;  // yylval存储和传递词法单元的值
+            while(isdigit(t)){
+                yylval.dval = yylval.dval * 10 + (t - '0');
+                t = getchar();
+            }
+            // 识别小数点后面的数字->浮点数汇编指令，麻烦了
+            //if(t == '.'){
+                //t = getchar();
+                //int i = 0.1;
+                //while(isdigit(t)){
+                    //yylval.dval = yylval.dval + (t - '0') * i;
+                    //i = i / 10;
+                    //t = getchar();
+                //}
+            //}
+            // 将读出的多余字符再次放回到缓冲区去
+            ungetc(t,stdin);
+            return NUMBER;
+        }
+        else if(t=='+'){
+            return ADD;
+        }
+        else if(t=='-'){
+            return MINUS;
+        }
+        else if(t=='*'){
+            return MUL;
+        }
+        else if(t=='/'){
+            return DIV;
+        }
+        else if(t=='('){
+            return LPAREN;
+        }
+        else if(t==')'){
+            return RPAREN;
+        }
+        else if(t=='='){  // 赋值符号
+            return ASSIGN;
+        }
+        else if(t=='&'){  // 逻辑与
+            t = getchar();
+            if(t!='&'){
+                yyerror("unknown character");
+            }
+            return AND;
+        }
+        else if(t=='|'){  // 逻辑或
+            t = getchar();
+            if(t!='|'){
+                yyerror("unknown character");
+            }
+            return OR;
+        }
+        else if(t=='!'){  // 逻辑非
+            return NOT;
+        }
+        else if(isalpha(t)){  // 识别标识符
+            char *p = yylval.name = malloc(MAX_NAME_LEN);
+            *p++ = t;
+            int len = 1;
+            // 读取标识符
+            while(isalnum(t=getchar())){
+                *p++ = t;
+                if(++len>=MAX_NAME_LEN){
+                    yyerror("name too long");
+                }
+            }
+            ungetc(t,stdin);  // 将多读的字符放回缓冲区
+            if(len==3&&strcmp(yylval.name,"int")==0){
+                return TYPE;
+            }
+            if(len==5&&strcmp(yylval.name,"const")==0){
+                return CONSTANT;
+            }
+            *p = '\0';  // 字符串结束符
+            return IDENTIFIER;
+        }
+        else if(t=='#'){  // 退出程序
+            return QUIT;
+        }
+        else{  // ;
+            return t;
+        }
+    }
+}
+
+struct symbol* findSymbol(char* name){
+    // 在符号表中查找一个符号
+    struct symbol *s;
+    for(s=symbolTable;s!=NULL;s=s->next){  // 遍历符号表
+        if(strcmp(s->name,name)==0){
+            return s;
+        }
+    }
+    return NULL;  // 没有找到
+}
+
+void addSymbol(char* name, double value, bool isConst, bool isAllocated){
+    // 向符号表中添加一个符号
+    struct symbol *s = findSymbol(name);
+    if(s!=NULL){  // 如果已经存在
+        if(s->isConst&&s->isAllocated){  // 常量不能被赋值
+            yyerror("constant cannot be assigned");
+        }
+        s->value = value;
+        s->isAllocated = true;
+    }
+    // 否则创建一个新的符号
+    s = malloc(sizeof(struct symbol));
+    s->name = strdup(name);
+    s->value = value;
+    s->next = symbolTable;
+    s->isConst = isConst;
+    s->isAllocated = isAllocated;
+    symbolTable = s;
 }
 
 int main(void)
