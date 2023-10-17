@@ -3,13 +3,15 @@
 #include<stdlib.h>
 #include<ctype.h>
 #include<stdbool.h>
+#include <locale.h>
+#include <wchar.h>
 
 int yylex();
 extern int yyparse();
 FILE* yyin;
 void yyerror(const char* s);
 
-#define epsilon '#'
+#define epsilon L'\u03B5'
 
 // 状态的定义
 #define MAX_NEXT_STATE 100
@@ -17,7 +19,7 @@ void yyerror(const char* s);
 int CurrentState = 0;
 struct edge     // 边
 {
-    char ch;
+    wchar_t ch;
     struct state* nextState;
 };
 struct state    // 状态
@@ -34,11 +36,11 @@ struct expr // 表达式的值
 
 /* 操控状态的函数 */
 // 
-void addEdge(struct state *s, char ch, struct state *nextState);
+void addEdge(struct state *s, wchar_t ch, struct state *nextState);
 // 创建新的状态
 struct state* newState(struct edge* nextEdge, int nextNum);
 // 创建新的表达式
-struct expr* newExprval(char ch);
+struct expr* newExprval(wchar_t ch);
 struct expr* newExprvalSE(struct state* start,struct state* end);
 // 连接两个表达式
 struct expr* connectExprval(struct expr* expr1,struct expr* expr2);
@@ -53,7 +55,7 @@ void printExprval(struct expr* expr);
 %}
 
 %union{
-    char chval;
+    wchar_t chval;
     struct expr* exprval;
 }
 // 运算符类型
@@ -65,7 +67,7 @@ void printExprval(struct expr* expr);
 
 // 结合律与优先级
 %left OR        // 或
-%left CONNECT   //  连接
+%left CONNECT    //  连接
 %right CLOSURE   // 闭包
 
 // 开始符号与非终结符
@@ -157,7 +159,7 @@ struct state* newState(struct edge* nextEdge, int nextNum)
     return s;
 }
 
-struct expr* newExprval(char ch)
+struct expr* newExprval(wchar_t ch)
 {
     struct state* start = newState(NULL,0);
     struct state* end = newState(NULL,0);
@@ -175,6 +177,8 @@ struct expr* newExprvalSE(struct state* start,struct state* end)
 
 void printState(struct state* s)
 {
+    setlocale(LC_ALL, "");  // 设置本地化环境
+    
     bool stateUsed[MAX_STATE_SIZE] = {false};
     struct state* stateStack[MAX_STATE_SIZE/2];
     int size = 0;
@@ -199,7 +203,7 @@ void printState(struct state* s)
 
         for (int i = 0; i < curState->nextNum; i++)
         {
-            printf("\t%d -> %d [label=\"%c\"];\n", curState->id, curState->nextEdge[i].nextState->id, curState->nextEdge[i].ch);
+            printf("\t%d -> %d [label=\"%lc\"];\n", curState->id, curState->nextEdge[i].nextState->id, curState->nextEdge[i].ch);
         }
 
         for (int i = 0; i < curState->nextNum; i++)
@@ -234,7 +238,7 @@ struct expr* connectExprval(struct expr* expr1,struct expr* expr2)
     return newExprvalSE(expr1->start,expr2->end);
 }
 
-void addEdge(struct state *s, char ch, struct state *nextState)
+void addEdge(struct state *s, wchar_t ch, struct state *nextState)
 {
     struct edge e;
     e.ch = ch;

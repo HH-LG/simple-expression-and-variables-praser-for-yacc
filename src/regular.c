@@ -73,13 +73,15 @@
 #include<stdlib.h>
 #include<ctype.h>
 #include<stdbool.h>
+#include <locale.h>
+#include <wchar.h>
 
 int yylex();
 extern int yyparse();
 FILE* yyin;
 void yyerror(const char* s);
 
-#define epsilon '#'
+#define epsilon L'\u03B5'
 
 // 状态的定义
 #define MAX_NEXT_STATE 100
@@ -87,7 +89,7 @@ void yyerror(const char* s);
 int CurrentState = 0;
 struct edge     // 边
 {
-    char ch;
+    wchar_t ch;
     struct state* nextState;
 };
 struct state    // 状态
@@ -104,11 +106,11 @@ struct expr // 表达式的值
 
 /* 操控状态的函数 */
 // 
-void addEdge(struct state *s, char ch, struct state *nextState);
+void addEdge(struct state *s, wchar_t ch, struct state *nextState);
 // 创建新的状态
 struct state* newState(struct edge* nextEdge, int nextNum);
 // 创建新的表达式
-struct expr* newExprval(char ch);
+struct expr* newExprval(wchar_t ch);
 struct expr* newExprvalSE(struct state* start,struct state* end);
 // 连接两个表达式
 struct expr* connectExprval(struct expr* expr1,struct expr* expr2);
@@ -121,7 +123,7 @@ void printState(struct state* s);
 // 打印exprval
 void printExprval(struct expr* expr);
 
-#line 125 "regular.c"
+#line 127 "regular.c"
 
 # ifndef YY_CAST
 #  ifdef __cplusplus
@@ -189,12 +191,12 @@ extern int yydebug;
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 union YYSTYPE
 {
-#line 55 "regular.y"
+#line 57 "regular.y"
 
-    char chval;
+    wchar_t chval;
     struct expr* exprval;
 
-#line 198 "regular.c"
+#line 200 "regular.c"
 
 };
 typedef union YYSTYPE YYSTYPE;
@@ -616,8 +618,8 @@ static const yytype_int8 yytranslate[] =
 /* YYRLINE[YYN] -- Source line where rule number YYN was defined.  */
 static const yytype_int8 yyrline[] =
 {
-       0,    79,    79,    80,    81,    84,    85,    88,    89,    92,
-      93,    94
+       0,    81,    81,    82,    83,    86,    87,    90,    91,    94,
+      95,    96
 };
 #endif
 
@@ -1182,61 +1184,61 @@ yyreduce:
   switch (yyn)
     {
   case 2: /* lines: lines expr ';'  */
-#line 79 "regular.y"
+#line 81 "regular.y"
                                                 { printExprval((yyvsp[-1].exprval));CurrentState = 0; }
-#line 1188 "regular.c"
+#line 1190 "regular.c"
     break;
 
   case 3: /* lines: lines QUIT  */
-#line 80 "regular.y"
+#line 82 "regular.y"
                                                 { printf("Now exiting...\n");exit(0); }
-#line 1194 "regular.c"
+#line 1196 "regular.c"
     break;
 
   case 5: /* expr: expr OR expr  */
-#line 84 "regular.y"
+#line 86 "regular.y"
                                                 { (yyval.exprval) = orExprval((yyvsp[-2].exprval),(yyvsp[0].exprval)); free((yyvsp[-2].exprval)); free((yyvsp[0].exprval)); }
-#line 1200 "regular.c"
+#line 1202 "regular.c"
     break;
 
   case 6: /* expr: unit_seq  */
-#line 85 "regular.y"
+#line 87 "regular.y"
                                                 { (yyval.exprval) = (yyvsp[0].exprval); }
-#line 1206 "regular.c"
+#line 1208 "regular.c"
     break;
 
   case 7: /* unit_seq: unit  */
-#line 88 "regular.y"
+#line 90 "regular.y"
                                                 { (yyval.exprval) = (yyvsp[0].exprval); }
-#line 1212 "regular.c"
+#line 1214 "regular.c"
     break;
 
   case 8: /* unit_seq: unit_seq unit  */
-#line 89 "regular.y"
+#line 91 "regular.y"
                                                 { (yyval.exprval) = connectExprval((yyvsp[-1].exprval),(yyvsp[0].exprval)); free((yyvsp[-1].exprval)); free((yyvsp[0].exprval)); }
-#line 1218 "regular.c"
+#line 1220 "regular.c"
     break;
 
   case 9: /* unit: UNIT  */
-#line 92 "regular.y"
+#line 94 "regular.y"
                                                 { (yyval.exprval) = newExprval((yyvsp[0].chval)); }
-#line 1224 "regular.c"
+#line 1226 "regular.c"
     break;
 
   case 10: /* unit: unit CLOSURE  */
-#line 93 "regular.y"
+#line 95 "regular.y"
                                                 { (yyval.exprval) = closureExprval((yyvsp[-1].exprval)); free((yyvsp[-1].exprval)); }
-#line 1230 "regular.c"
+#line 1232 "regular.c"
     break;
 
   case 11: /* unit: L_BRAC expr R_BRAC  */
-#line 94 "regular.y"
+#line 96 "regular.y"
                                                 { (yyval.exprval) = (yyvsp[-1].exprval); }
-#line 1236 "regular.c"
+#line 1238 "regular.c"
     break;
 
 
-#line 1240 "regular.c"
+#line 1242 "regular.c"
 
       default: break;
     }
@@ -1429,7 +1431,7 @@ yyreturnlab:
   return yyresult;
 }
 
-#line 98 "regular.y"
+#line 100 "regular.y"
 
 
 // programs section
@@ -1492,7 +1494,7 @@ struct state* newState(struct edge* nextEdge, int nextNum)
     return s;
 }
 
-struct expr* newExprval(char ch)
+struct expr* newExprval(wchar_t ch)
 {
     struct state* start = newState(NULL,0);
     struct state* end = newState(NULL,0);
@@ -1510,6 +1512,8 @@ struct expr* newExprvalSE(struct state* start,struct state* end)
 
 void printState(struct state* s)
 {
+    setlocale(LC_ALL, "");  // 设置本地化环境
+    
     bool stateUsed[MAX_STATE_SIZE] = {false};
     struct state* stateStack[MAX_STATE_SIZE/2];
     int size = 0;
@@ -1534,7 +1538,7 @@ void printState(struct state* s)
 
         for (int i = 0; i < curState->nextNum; i++)
         {
-            printf("\t%d -> %d [label=\"%c\"];\n", curState->id, curState->nextEdge[i].nextState->id, curState->nextEdge[i].ch);
+            printf("\t%d -> %d [label=\"%lc\"];\n", curState->id, curState->nextEdge[i].nextState->id, curState->nextEdge[i].ch);
         }
 
         for (int i = 0; i < curState->nextNum; i++)
@@ -1569,7 +1573,7 @@ struct expr* connectExprval(struct expr* expr1,struct expr* expr2)
     return newExprvalSE(expr1->start,expr2->end);
 }
 
-void addEdge(struct state *s, char ch, struct state *nextState)
+void addEdge(struct state *s, wchar_t ch, struct state *nextState)
 {
     struct edge e;
     e.ch = ch;
